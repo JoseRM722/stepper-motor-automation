@@ -21,6 +21,9 @@ class MotorPasoAPaso:
         
         if posicion_futura > self.limite_max_pasos:
             print(f"¡ALERTA! Movimiento bloqueado. El motor {self.nombre_eje} excedería el límite físico.")
+
+        elif posicion_futura < self.limite_max_pasos:
+            print(f"¡ALERTA! Movimiento bloqueado. El motor {self.nombre_eje} echocaría el límite físico.")
         else:
             self.__posicion_actual_pasos = posicion_futura
             print(f"Motor {self.nombre_eje}: se movió {cantidad_pasos} pasos. Posición validada.")
@@ -43,7 +46,8 @@ class MotorPasoAPaso:
 motor_y = MotorPasoAPaso("Y", pasos_por_mm=100.0, limite_max_mm=50.0)
 
 # Intentamos un movimiento válido
-motor_y.dar_pasos(3000)
+motor_y.dar_pasos(-3000)
+
 
 # Intentamos un movimiento que excede el límite (El límite son 50 mm = 5000 pasos)
 motor_y.dar_pasos(3000) # Esto intentaría llegar a 60 mm (Bloqueado)
