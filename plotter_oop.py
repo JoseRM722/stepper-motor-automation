@@ -38,23 +38,26 @@ class MotorPasoAPaso:
         desde afuera, pero convirtiéndola a milímetros sin permitir alterarla.
         """
         return round(self.__posicion_actual_pasos / self.factor_conversion, 3)
+class LimiteMotorError(Exception):
+    "Excepción lanzada cuando el motor intenta exceder sus límites físicos"
+    pass
 
 # ==========================================
 # ÁREA DE PRUEBAS
 # ==========================================
 
-motor_y = MotorPasoAPaso("Y", pasos_por_mm=100.0, limite_max_mm=50.0)
+motor_y = MotorPasoAPaso("Y", pasos_por_mm=100.0, limite_max_mm=50)
 
-# Intentamos un movimiento válido
-motor_y.dar_pasos(-3000)
+try:
+    print("\n--- Iniciando movimientos ---")
+    motor_y.dar_pasos(3000)
+    motor_y.dar_pasos(-1000)
 
+    print("Intentando paso peligroso")
+    motor_y.dar_pasos(-5000)
 
-# Intentamos un movimiento que excede el límite (El límite son 50 mm = 5000 pasos)
-motor_y.dar_pasos(3000) # Esto intentaría llegar a 60 mm (Bloqueado)
-
-# Intentamos hackear la posición directamente desde afuera (Esto creará una variable nueva inútil, 
-# pero la variable interna real del motor seguirá protegida)
-motor_y.__posicion_actual_pasos = 99999 
-
+    print("Este mensaje no se mostrará")
+except LimiteMotorError as error_detectado:
+    print(f"Paro de emergencia activado, motivo: {error_detectado}")
 
 print(f"Posición real protegida: {motor_y.obtener_posicion_mm()} mm")
