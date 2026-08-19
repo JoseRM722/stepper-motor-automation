@@ -42,6 +42,9 @@ class MotorPasoAPaso:
         return round(self.__posicion_actual_pasos / self.factor_conversion, 3)
 
 class MiniPLotterCNC:
+    def home(self):
+        self.motor_x.ir_a_origen()
+        self.motor_y.ir_a_origen()
     def __init__(self):
         self.motor_x = MotorPasoAPaso("X", limite_max_mm=200.0)
         self.motor_y = MotorPasoAPaso("Y", limite_max_mm=200.0)
@@ -66,14 +69,59 @@ class MiniPLotterCNC:
             print(resultado)
 
             print("    -> [Eje Z]: Bajando broca... Perforando... Subiendo broca")
+    def ejecutar_comando_gcode(self, comando_texto):
+        comando_texto = comando_texto.strip()
+        print(f"\n[Lector G-Code] Analizando instrucción: '{comando_texto}'")
+
+        partes = comando_texto.split()
+
+        if not partes:
+            return
+
+        if partes[0] == "G1":
+            x_destino = None
+            y_destino = None
+            z_destino = None
+            e_destino = None
+
+            for parte in partes:
+                if parte.startswith("X"):
+                    x_destino = float(parte[1:])
+                elif parte.startswith("Y"):
+                    y_destino = float(parte[1:])
+                elif parte.startswith("Z"):
+                    z_destino = float(parte[1:])
+                elif parte.startswith("E"):
+                    e_destino = float(parte[1:])
+
+            if x_destino is not None and y_destino is not None:
+                self.mover_absoluto(x_destino, y_destino)
+
+            if z_destino is not None:
+                print (f"   -> [Eje Z]: Moviendo a la capa / profundidad {z_destino} mm")
+
+            if e_destino is not None:
+                print(f"   -> [Extrusor]: Empujando {e_destino} mm de filamento")
+        elif partes[0] == "G28":
+            self.home()
+        else:
+            print("ERROR: Comando no reconocido en la simulación")
 
 # ==========================================
 # ÁREA DE PRUEBAS
 # ==========================================
 mi_plotter = MiniPLotterCNC()
 
-puntos_a_perforar = [
-    (10,10), (25,10), (25,40), (250, 40)
-]
+# Simulación de un archivo G-Code de una Impresora 3D
+print("\n--- SIMULANDO IMPRESIÓN 3D ---")
+mi_plotter.ejecutar_comando_gcode("G28") # Homing
+mi_plotter.ejecutar_comando_gcode("G1 Z0.2") # Sube a la primera capa
+mi_plotter.ejecutar_comando_gcode("G1 X10 Y10 E1.5") # Dibuja extruyendo plástico
+mi_plotter.ejecutar_comando_gcode("G1 X20 Y10 E3.0") # Sigue dibujando
 
-mi_plotter.perforar_puntos(puntos_a_perforar)
+# Simulación de un archivo G-Code de una Fresadora CNC (SolidWorks)
+print("\n--- SIMULANDO FRESADORA CNC ---")
+mi_plotter.ejecutar_comando_gcode("G28")
+mi_plotter.ejecutar_comando_gcode("G1 X50 Y50") # Se posiciona sobre la pieza
+mi_plotter.ejecutar_comando_gcode("G1 Z-5.0") # La broca baja 5mm hacia adentro del material
+mi_plotter.ejecutar_comando_gcode("G1 X60 Y50") # Realiza un corte lateral
