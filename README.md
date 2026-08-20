@@ -84,6 +84,3 @@ except MotorLimitError as e:
 - `BaseCobotCNC.move_operate()` is an unimplemented stub — subclasses must override it.
 - No unit tests yet.
 
-## License
-
-*(Add a license — e.g. MIT — so others know how they can use this code.)*
