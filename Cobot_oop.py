@@ -11,7 +11,7 @@ class BaseCobotCNC():
     def equipar(self, nueva_herramienta):
         self.herramienta_actual = nueva_herramienta
         nombre_herramienta = type(nueva_herramienta).__name__
-        print("[Hardware] ----> {nombre_herramienta} equipado")
+        print(f"[Hardware] ----> {nombre_herramienta} equipado")
 
     def home(self):
         print("Iniciar secuencia de HOming de la base")
