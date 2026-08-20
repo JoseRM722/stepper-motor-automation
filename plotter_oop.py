@@ -48,16 +48,19 @@ class MiniPLotterCNC:
     def __init__(self):
         self.motor_x = MotorPasoAPaso("X", limite_max_mm=200.0)
         self.motor_y = MotorPasoAPaso("Y", limite_max_mm=200.0)
+        self.historial_gcode = []
     def mover_absoluto(self, destino_x_mm, destino_y_mm):
         delta_x = destino_x_mm - self.motor_x.obtener_posicion_mm()
         delta_y = destino_y_mm - self.motor_y.obtener_posicion_mm()
 
         pasos_x = int(delta_x * self.motor_x.factor_conversion)
         pasos_y = int(delta_y * self.motor_y.factor_conversion) 
-
+        
         try:
             self.motor_x.dar_pasos(pasos_x)
             self.motor_y.dar_pasos(pasos_y)
+            cadena_generada = f"G1 X{destino_x_mm} Y{destino_y_mm} F1000"
+            self.historial_gcode.append(cadena_generada)
             return f"G1 X{destino_x_mm} Y{destino_y_mm} ; OK"
         except LimiteMotorError as e:
             print("Error del sistema: Movimiento abortado por seguridad")
@@ -69,6 +72,11 @@ class MiniPLotterCNC:
             print(resultado)
 
             print("    -> [Eje Z]: Bajando broca... Perforando... Subiendo broca")
+    def exportar_archivo(self, nombre_archivo="trayectoria_cnc.gcode"):
+        with open(nombre_archivo, 'w') as archivo:
+            for linea in self.historial_gcode:
+                archivo.write(f"{linea}\n")
+        print(f"[Hardware] Archivo {nombre_archivo} exportado exitosamente.")
     def ejecutar_comando_gcode(self, comando_texto):
         comando_texto = comando_texto.strip()
         print(f"\n[Lector G-Code] Analizando instrucción: '{comando_texto}'")
@@ -115,13 +123,15 @@ mi_plotter = MiniPLotterCNC()
 # Simulación de un archivo G-Code de una Impresora 3D
 print("\n--- SIMULANDO IMPRESIÓN 3D ---")
 mi_plotter.ejecutar_comando_gcode("G28") # Homing
-mi_plotter.ejecutar_comando_gcode("G1 Z0.2") # Sube a la primera capa
-mi_plotter.ejecutar_comando_gcode("G1 X10 Y10 E1.5") # Dibuja extruyendo plástico
-mi_plotter.ejecutar_comando_gcode("G1 X20 Y10 E3.0") # Sigue dibujando
+mi_plotter.ejecutar_comando_gcode("G1 Z0.2") 
+mi_plotter.ejecutar_comando_gcode("G1 X10 Y10 E1.5") 
+mi_plotter.ejecutar_comando_gcode("G1 X20 Y10 E3.0") 
 
 # Simulación de un archivo G-Code de una Fresadora CNC (SolidWorks)
 print("\n--- SIMULANDO FRESADORA CNC ---")
 mi_plotter.ejecutar_comando_gcode("G28")
-mi_plotter.ejecutar_comando_gcode("G1 X50 Y50") # Se posiciona sobre la pieza
-mi_plotter.ejecutar_comando_gcode("G1 Z-5.0") # La broca baja 5mm hacia adentro del material
-mi_plotter.ejecutar_comando_gcode("G1 X60 Y50") # Realiza un corte lateral
+mi_plotter.ejecutar_comando_gcode("G1 X50 Y50")
+mi_plotter.ejecutar_comando_gcode("G1 Z-5.0") 
+mi_plotter.ejecutar_comando_gcode("G1 X60 Y50") 
+
+mi_plotter.exportar_archivo()
