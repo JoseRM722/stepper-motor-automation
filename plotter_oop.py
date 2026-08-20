@@ -1,137 +1,144 @@
 import math
-class LimiteMotorError(Exception):
+
+class MotorLimitError(Exception):
     pass
-class MotorPasoAPaso:
-    def __init__(self, eje, pasos_por_mm=100.0, limite_max_mm=200.0):
-        self.nombre_eje = eje
-        self.factor_conversion = pasos_por_mm
-        
-        # 1. ENCAPSULAMIENTO: Al usar '__', la variable se vuelve privada.
-        # No se puede acceder a ella directamente desde fuera de la clase.
-        self.__posicion_actual_pasos = 0 
-        
-        # Límite físico de la máquina para evitar colisiones
-        self.limite_max_pasos = limite_max_mm * pasos_por_mm
 
-    def dar_pasos(self, cantidad_pasos):
+class StepperMotor:
+    def __init__(self, axis, steps_per_mm=100.0, max_limit_mm=200.0):
+        self.axis_name = axis
+        self.conversion_factor = steps_per_mm
+
+        # 1. ENCAPSULATION: Using '__' makes the variable private.
+        # It cannot be accessed directly from outside the class.
+        self.__current_position_steps = 0
+
+        # Physical machine limit to prevent collisions
+        self.max_limit_steps = max_limit_mm * steps_per_mm
+
+    def take_steps(self, step_count):
         """
-        Única forma permitida de modificar la posición privada.
-        Incluye lógica intuitiva de topes de seguridad.
+        The only allowed way to modify the private position.
+        Includes built-in safety limit checks.
         """
 
-        posicion_futura = self.__posicion_actual_pasos + cantidad_pasos
-        
-        if posicion_futura > self.limite_max_pasos:
-            raise LimiteMotorError(f"El motor {self.nombre_eje} excedería el límite físico máximo.")
+        future_position = self.__current_position_steps + step_count
 
-        elif posicion_futura < 0:
-            raise LimiteMotorError(f"El motor {self.nombre_eje} chocaría con el orígen.")
+        if future_position > self.max_limit_steps:
+            raise MotorLimitError(f"Motor {self.axis_name} would exceed the maximum physical limit.")
+
+        elif future_position < 0:
+            raise MotorLimitError(f"Motor {self.axis_name} would crash into the origin.")
         else:
-            self.__posicion_actual_pasos = posicion_futura
-            print(f"Motor {self.nombre_eje}: se movió {cantidad_pasos} pasos. Posición validada.")
+            self.__current_position_steps = future_position
+            print(f"Motor {self.axis_name}: moved {step_count} steps. Position validated.")
 
-    def ir_a_origen(self):
-        self.__posicion_actual_pasos = 0
-        print(f"El motor {self.nombre_eje} ha vuelto al origen de forma segura.")
+    def go_to_origin(self):
+        self.__current_position_steps = 0
+        print(f"Motor {self.axis_name} has safely returned to origin.")
 
-    def obtener_posicion_mm(self):
+    def get_position_mm(self):
         """
-        Método 'Getter': Permite consultar el valor de la variable privada
-        desde afuera, pero convirtiéndola a milímetros sin permitir alterarla.
+        'Getter' method: Allows querying the value of the private variable
+        from outside, converting it to millimeters without allowing it to be altered.
         """
-        return round(self.__posicion_actual_pasos / self.factor_conversion, 3)
+        return round(self.__current_position_steps / self.conversion_factor, 3)
 
-class MiniPLotterCNC:
+class MiniPlotterCNC:
     def home(self):
-        self.motor_x.ir_a_origen()
-        self.motor_y.ir_a_origen()
+        self.motor_x.go_to_origin()
+        self.motor_y.go_to_origin()
+
     def __init__(self):
-        self.motor_x = MotorPasoAPaso("X", limite_max_mm=200.0)
-        self.motor_y = MotorPasoAPaso("Y", limite_max_mm=200.0)
-        self.historial_gcode = []
-    def mover_absoluto(self, destino_x_mm, destino_y_mm):
-        delta_x = destino_x_mm - self.motor_x.obtener_posicion_mm()
-        delta_y = destino_y_mm - self.motor_y.obtener_posicion_mm()
+        self.motor_x = StepperMotor("X", max_limit_mm=200.0)
+        self.motor_y = StepperMotor("Y", max_limit_mm=200.0)
+        self.gcode_history = []
 
-        pasos_x = int(delta_x * self.motor_x.factor_conversion)
-        pasos_y = int(delta_y * self.motor_y.factor_conversion) 
-        
+    def move_absolute(self, target_x_mm, target_y_mm):
+        delta_x = target_x_mm - self.motor_x.get_position_mm()
+        delta_y = target_y_mm - self.motor_y.get_position_mm()
+
+        steps_x = int(delta_x * self.motor_x.conversion_factor)
+        steps_y = int(delta_y * self.motor_y.conversion_factor)
+
         try:
-            self.motor_x.dar_pasos(pasos_x)
-            self.motor_y.dar_pasos(pasos_y)
-            cadena_generada = f"G1 X{destino_x_mm} Y{destino_y_mm} F1000"
-            self.historial_gcode.append(cadena_generada)
-            return f"G1 X{destino_x_mm} Y{destino_y_mm} ; OK"
-        except LimiteMotorError as e:
-            print("Error del sistema: Movimiento abortado por seguridad")
+            self.motor_x.take_steps(steps_x)
+            self.motor_y.take_steps(steps_y)
+            generated_line = f"G1 X{target_x_mm} Y{target_y_mm} F1000"
+            self.gcode_history.append(generated_line)
+            return f"G1 X{target_x_mm} Y{target_y_mm} ; OK"
+        except MotorLimitError as e:
+            print("System error: Movement aborted for safety")
             return f"; ERROR: {e}"
-    def perforar_puntos(self, lista_coordenadas):
-        for x, y in lista_coordenadas:
-            resultado = self.mover_absoluto(x, y)
 
-            print(resultado)
+    def drill_points(self, coordinate_list):
+        for x, y in coordinate_list:
+            result = self.move_absolute(x, y)
 
-            print("    -> [Eje Z]: Bajando broca... Perforando... Subiendo broca")
-    def exportar_archivo(self, nombre_archivo="trayectoria_cnc.gcode"):
-        with open(nombre_archivo, 'w') as archivo:
-            for linea in self.historial_gcode:
-                archivo.write(f"{linea}\n")
-        print(f"[Hardware] Archivo {nombre_archivo} exportado exitosamente.")
-    def ejecutar_comando_gcode(self, comando_texto):
-        comando_texto = comando_texto.strip()
-        print(f"\n[Lector G-Code] Analizando instrucción: '{comando_texto}'")
+            print(result)
 
-        partes = comando_texto.split()
+            print("    -> [Z Axis]: Lowering bit... Drilling... Raising bit")
 
-        if not partes:
+    def export_file(self, file_name="cnc_trajectory.gcode"):
+        with open(file_name, 'w') as file:
+            for line in self.gcode_history:
+                file.write(f"{line}\n")
+        print(f"[Hardware] File {file_name} exported successfully.")
+
+    def execute_gcode_command(self, command_text):
+        command_text = command_text.strip()
+        print(f"\n[G-Code Reader] Parsing instruction: '{command_text}'")
+
+        parts = command_text.split()
+
+        if not parts:
             return
 
-        if partes[0] == "G1":
-            x_destino = None
-            y_destino = None
-            z_destino = None
-            e_destino = None
+        if parts[0] == "G1":
+            x_target = None
+            y_target = None
+            z_target = None
+            e_target = None
 
-            for parte in partes:
-                if parte.startswith("X"):
-                    x_destino = float(parte[1:])
-                elif parte.startswith("Y"):
-                    y_destino = float(parte[1:])
-                elif parte.startswith("Z"):
-                    z_destino = float(parte[1:])
-                elif parte.startswith("E"):
-                    e_destino = float(parte[1:])
+            for part in parts:
+                if part.startswith("X"):
+                    x_target = float(part[1:])
+                elif part.startswith("Y"):
+                    y_target = float(part[1:])
+                elif part.startswith("Z"):
+                    z_target = float(part[1:])
+                elif part.startswith("E"):
+                    e_target = float(part[1:])
 
-            if x_destino is not None and y_destino is not None:
-                self.mover_absoluto(x_destino, y_destino)
+            if x_target is not None and y_target is not None:
+                self.move_absolute(x_target, y_target)
 
-            if z_destino is not None:
-                print (f"   -> [Eje Z]: Moviendo a la capa / profundidad {z_destino} mm")
+            if z_target is not None:
+                print(f"   -> [Z Axis]: Moving to layer / depth {z_target} mm")
 
-            if e_destino is not None:
-                print(f"   -> [Extrusor]: Empujando {e_destino} mm de filamento")
-        elif partes[0] == "G28":
+            if e_target is not None:
+                print(f"   -> [Extruder]: Pushing {e_target} mm of filament")
+        elif parts[0] == "G28":
             self.home()
         else:
-            print("ERROR: Comando no reconocido en la simulación")
+            print("ERROR: Command not recognized in the simulation")
 
 # ==========================================
-# ÁREA DE PRUEBAS
+# TEST AREA
 # ==========================================
-mi_plotter = MiniPLotterCNC()
+my_plotter = MiniPlotterCNC()
 
-# Simulación de un archivo G-Code de una Impresora 3D
-print("\n--- SIMULANDO IMPRESIÓN 3D ---")
-mi_plotter.ejecutar_comando_gcode("G28") # Homing
-mi_plotter.ejecutar_comando_gcode("G1 Z0.2") 
-mi_plotter.ejecutar_comando_gcode("G1 X10 Y10 E1.5") 
-mi_plotter.ejecutar_comando_gcode("G1 X20 Y10 E3.0") 
+# Simulating a G-Code file from a 3D Printer
+print("\n--- SIMULATING 3D PRINTING ---")
+my_plotter.execute_gcode_command("G28")  # Homing
+my_plotter.execute_gcode_command("G1 Z0.2")
+my_plotter.execute_gcode_command("G1 X10 Y10 E1.5")
+my_plotter.execute_gcode_command("G1 X20 Y10 E3.0")
 
-# Simulación de un archivo G-Code de una Fresadora CNC (SolidWorks)
-print("\n--- SIMULANDO FRESADORA CNC ---")
-mi_plotter.ejecutar_comando_gcode("G28")
-mi_plotter.ejecutar_comando_gcode("G1 X50 Y50")
-mi_plotter.ejecutar_comando_gcode("G1 Z-5.0") 
-mi_plotter.ejecutar_comando_gcode("G1 X60 Y50") 
+# Simulating a G-Code file from a CNC Mill (SolidWorks)
+print("\n--- SIMULATING CNC MILLING ---")
+my_plotter.execute_gcode_command("G28")
+my_plotter.execute_gcode_command("G1 X50 Y50")
+my_plotter.execute_gcode_command("G1 Z-5.0")
+my_plotter.execute_gcode_command("G1 X60 Y50")
 
-mi_plotter.exportar_archivo()
+my_plotter.export_file()
